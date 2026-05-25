@@ -4,7 +4,7 @@ Skill Scanner v5.0 - Context-Aware Security Scanner for OpenClaw Skills
 with Multi-Provider AI Support and CI/CD Integration
 
 NEW in v5.0:
-- Multi-provider model support (OpenRouter, Anthropic, OpenAI, Z.ai)
+- Multi-provider model support (Anthropic, OpenAI, Z.ai)
 - Auto-detection from environment variables
 - CLI flags: --model and --provider
 - SARIF output for GitHub Security integration
@@ -82,19 +82,6 @@ class ModelProvider:
     """Configuration for AI model providers."""
     
     PROVIDERS = {
-        'openrouter': {
-            'env_key': 'OPENROUTER_API_KEY',
-            'api_url': 'https://openrouter.ai/api/v1/chat/completions',
-            'default_model': 'anthropic/claude-3.5-sonnet',
-            'models': [
-                'anthropic/claude-3.5-sonnet',
-                'anthropic/claude-3.5-haiku',
-                'openai/gpt-4o',
-                'openai/gpt-4o-mini',
-                'google/gemini-flash-1.5',
-                'meta-llama/llama-3.2-70b-instruct',
-            ]
-        },
         'anthropic': {
             'env_key': 'ANTHROPIC_API_KEY',
             'api_url': 'https://api.anthropic.com/v1/messages',
@@ -138,8 +125,9 @@ class ModelProvider:
             key_path = os.path.expanduser(f'~/clawd/secrets/{provider}.key')
             if os.path.exists(key_path):
                 available.append(provider)
-        # Fallback order priority
-        priority = ['anthropic', 'openai', 'openrouter', 'zai']
+        # Fallback order priority. OpenRouter is disabled by Henry until explicitly re-enabled.
+        available = [provider for provider in available if provider != 'openrouter']
+        priority = ['anthropic', 'openai', 'zai']
         return sorted(list(set(available)), 
                      key=lambda x: priority.index(x) if x in priority else 999)
     
@@ -296,6 +284,7 @@ BLOCKLIST_INDICATORS = [
 SECURITY_TOOL_INDICATORS = [
     'prompt-guard', 'prompt_guard', 'security-scan', 'detect.py',
     'patterns.py', 'blocklist', 'firewall', 'waf', 'filter',
+    'heimdall', 'skill-scan',
 ]
 
 
@@ -387,7 +376,14 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
     (r"cat\s+.*\.env\b", Severity.CRITICAL, "credential_access", "Reading .env file"),
     (r"source\s+.*\.env\b", Severity.HIGH, "credential_access", "Sourcing .env file"),
     (r"open\([^)]*\.env[^)]*\)", Severity.HIGH, "credential_access", "Opening .env file"),
+    (r"Path\([^)]*\.env[^)]*\)\.read_text\s*\(", Severity.HIGH, "credential_access", "Reading .env with pathlib"),
+    (r"(?:fs\.)?readFileSync\s*\([^)]*\.env[^)]*\)", Severity.HIGH, "credential_access", "Reading .env with readFileSync"),
     (r"secrets?/[a-zA-Z]", Severity.HIGH, "credential_access", "Accessing secrets directory"),
+    (r"(?:~/|/home/[^/]+/)?\.aws/credentials", Severity.CRITICAL, "credential_access", "AWS credentials file access"),
+    (r"(?:~/|/home/[^/]+/)?\.ssh/(?:id_|authorized|config)", Severity.CRITICAL, "credential_access", "SSH credential file access"),
+    (r"(?:~/|/home/[^/]+/)?clawd/secrets/[A-Za-z0-9_.-]+", Severity.CRITICAL, "credential_access", "OpenClaw secrets file access"),
+    (r"(?:service[_-]?account|credentials?)\.json", Severity.HIGH, "credential_access", "Credential JSON file reference"),
+    (r"(?:os\.environ(?:\.get)?|process\.env)\s*(?:\[|\(|\.)[^\n]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)", Severity.MEDIUM, "credential_access", "Runtime credential environment access"),
     (r"password\s*=\s*['\"][^'\"]+['\"]", Severity.CRITICAL, "credential_access", "Hardcoded password"),
     (r"api[_-]?key\s*=\s*['\"][^'\"]{10,}['\"]", Severity.CRITICAL, "credential_access", "Hardcoded API key"),
     (r"token\s*=\s*['\"][^'\"]{20,}['\"]", Severity.CRITICAL, "credential_access", "Hardcoded token"),
@@ -405,9 +401,12 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
     (r"database[_-]?url\s*[=:]\s*['\"][^'\"]+['\"]", Severity.HIGH, "credential_access", "Database connection string"),
     
     # Network Exfiltration
+    (r"\bcurl\b(?=[^\n]*https?://(?!(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]))[^\s'\"<>]+)", Severity.HIGH, "network_exfil", "Curl to external URL"),
     (r"curl\s+-[^s]*\s+(http|https)://(?!localhost|127\.0\.0\.1)", Severity.HIGH, "network_exfil", "Curl to external URL"),
+    (r"\bwget\b(?=[^\n]*https?://(?!(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]))[^\s'\"<>]+)", Severity.HIGH, "network_exfil", "Wget to external URL"),
     (r"wget\s+(http|https)://(?!localhost|127\.0\.0\.1)", Severity.HIGH, "network_exfil", "Wget to external URL"),
     (r"requests\.(get|post|put|delete)\s*\(['\"]https?://(?!localhost)", Severity.MEDIUM, "network_exfil", "HTTP request to external"),
+    (r"axios\.(get|post|put|delete)\s*\(['\"]https?://(?!localhost)", Severity.MEDIUM, "network_exfil", "Axios request to external"),
     (r"fetch\s*\(\s*['\"]https?://(?!localhost)", Severity.MEDIUM, "network_exfil", "Fetch to external URL"),
     (r"webhook\.site", Severity.CRITICAL, "network_exfil", "Known exfil domain"),
     (r"ngrok\.io", Severity.HIGH, "network_exfil", "Ngrok tunnel"),
@@ -421,10 +420,17 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
     # Shell Execution
     (r"subprocess\.(?:run|call|Popen)\s*\(\s*['\"]", Severity.HIGH, "shell_exec", "Subprocess with string command"),
     (r"subprocess\.(?:run|call|Popen)\s*\(\s*\[", Severity.MEDIUM, "shell_exec", "Subprocess with list command"),
+    (r"subprocess\.(?:run|call|Popen)\s*\([^)]*shell\s*=\s*True", Severity.CRITICAL, "shell_exec", "Subprocess shell=True"),
     (r"os\.system\s*\(\s*['\"]", Severity.HIGH, "shell_exec", "OS system call"),
     (r"os\.popen\s*\(\s*['\"]", Severity.HIGH, "shell_exec", "OS popen"),
+    (r"\bexec\s*\(", Severity.HIGH, "shell_exec", "Dynamic exec call"),
     (r"exec\s*\(\s*(?:compile|open)", Severity.CRITICAL, "shell_exec", "Exec with dynamic code"),
     (r"eval\s*\(\s*(?:input|request|argv)", Severity.CRITICAL, "shell_exec", "Eval with user input"),
+    (r"\b(?:execFile|spawn|spawnSync|execSync)\s*\(", Severity.HIGH, "shell_exec", "Node child_process execution"),
+    (r"child_process\.(?:exec|execFile|spawn|spawnSync|execSync)\s*\(", Severity.HIGH, "shell_exec", "Node child_process execution"),
+    (r"require\s*\(\s*['\"]child_process['\"]\s*\)", Severity.HIGH, "shell_exec", "Node child_process import"),
+    (r"Runtime\.getRuntime\(\)\.exec\s*\(", Severity.HIGH, "shell_exec", "Java runtime exec"),
+    (r"ProcessBuilder\s*\(", Severity.HIGH, "shell_exec", "Java ProcessBuilder execution"),
     (r"\|\s*bash\s*$", Severity.CRITICAL, "shell_exec", "Pipe to bash"),
     (r"\|\s*sh\s*$", Severity.CRITICAL, "shell_exec", "Pipe to shell"),
     (r"bash\s+-c\s+['\"]", Severity.HIGH, "shell_exec", "Bash -c execution"),
@@ -437,6 +443,13 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
     (r"~/.ssh/(?:id_|authorized)", Severity.CRITICAL, "filesystem", "SSH key access"),
     
     # Obfuscation
+    (r"base64\.b64decode\s*\(", Severity.HIGH, "obfuscation", "Base64 decode in code"),
+    (r"\bbase64\s+-d\b", Severity.HIGH, "obfuscation", "Base64 decode shell command"),
+    (r"\batob\s*\(", Severity.HIGH, "obfuscation", "Base64 decode in JavaScript"),
+    (r"Buffer\.from\s*\([^)]*['\"]base64['\"]", Severity.HIGH, "obfuscation", "Base64 decode with Buffer.from"),
+    (r"marshal\.loads\s*\(", Severity.CRITICAL, "obfuscation", "Python marshal payload load"),
+    (r"zlib\.decompress\s*\(", Severity.HIGH, "obfuscation", "Compressed payload decode"),
+    (r"codecs\.decode\s*\(", Severity.HIGH, "obfuscation", "Encoded payload decode"),
     (r"exec\s*\(\s*base64\.b64decode", Severity.CRITICAL, "obfuscation", "Exec base64 payload"),
     (r"eval\s*\(\s*base64\.b64decode", Severity.CRITICAL, "obfuscation", "Eval base64 payload"),
     (r"exec\s*\(\s*codecs\.decode", Severity.CRITICAL, "obfuscation", "Exec encoded payload"),
@@ -445,6 +458,10 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
     
     # Data Exfiltration
     (r"(post|put|send)\s*\([^)]*\b(password|token|api_?key|secret)\b", Severity.CRITICAL, "data_exfil", "Sending credentials"),
+    (r"requests\.post\s*\([^)]*(?:os\.environ|process\.env|\.env|secret|token|api_?key)", Severity.CRITICAL, "data_exfil", "Posting credential-like data"),
+    (r"fetch\s*\([^)]*(?:method\s*:\s*['\"]POST|body\s*:)[^)]*(?:process\.env|secret|token|api_?key)", Severity.CRITICAL, "data_exfil", "Fetch posting credential-like data"),
+    (r"curl\b[^\n]*(?:--data|-d|--form|-F)[^\n]*(?:secret|token|api[_-]?key|password)", Severity.CRITICAL, "data_exfil", "Curl exfiltrating credential-like data"),
+    (r"(?:tar|zip)\b[^\n]*(?:\.env|secrets?/|\.ssh/)", Severity.HIGH, "data_exfil", "Packaging credential files"),
     (r"json\.dumps\s*\([^)]*\benv\b", Severity.HIGH, "data_exfil", "Serializing env"),
     (r"\.env\s*\+\s*['\"]", Severity.HIGH, "data_exfil", "Concatenating env data"),
     
@@ -532,6 +549,7 @@ PATTERNS: List[Tuple[str, Severity, str, str]] = [
 ]
 
 SCAN_EXTENSIONS = {'.py', '.js', '.ts', '.sh', '.bash', '.mjs', '.cjs', '.md', '.yaml', '.yml', '.json', '.toml', '.ini', '.txt'}
+SKIP_DIRS = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'dist', 'build'}
 
 
 # =============================================================================
@@ -659,6 +677,13 @@ def scan_file_worker(args: Tuple[Path, bool]) -> Tuple[Path, List[Finding]]:
     return filepath, findings
 
 
+def should_scan_file(filepath: Path) -> bool:
+    """Return True when a path is a scan-relevant source file."""
+    if any(part in SKIP_DIRS for part in filepath.parts):
+        return False
+    return filepath.is_file() and filepath.suffix.lower() in SCAN_EXTENSIONS
+
+
 def scan_skill(skill_path: str, strict: bool = False, parallel: bool = True, 
                custom_patterns: Optional[List] = None) -> ScanResult:
     """Scan a skill directory or file."""
@@ -672,9 +697,9 @@ def scan_skill(skill_path: str, strict: bool = False, parallel: bool = True,
     result = ScanResult(path=str(path), files_scanned=0)
     
     if path.is_file():
-        files = [path]
+        files = [path] if should_scan_file(path) else []
     else:
-        files = [f for f in path.rglob('*') if f.is_file() and f.suffix.lower() in SCAN_EXTENSIONS]
+        files = [f for f in path.rglob('*') if should_scan_file(f)]
     
     # Parallel scanning for performance
     if parallel and len(files) > 10:
@@ -705,11 +730,13 @@ def get_skill_content(path: str, max_chars: int = 50000) -> str:
     content_parts = []
     total_chars = 0
     
-    for filepath in sorted(p.rglob('*')):
-        if filepath.is_file() and filepath.suffix.lower() in SCAN_EXTENSIONS:
+    scan_root = p if p.is_dir() else p.parent
+    candidates = sorted(p.rglob('*')) if p.is_dir() else [p]
+    for filepath in candidates:
+        if should_scan_file(filepath):
             try:
                 text = filepath.read_text(encoding='utf-8', errors='ignore')
-                rel_path = str(filepath.relative_to(p))
+                rel_path = str(filepath.relative_to(scan_root))
                 chunk = f"\n--- {rel_path} ---\n{text[:10000]}\n"
                 if total_chars + len(chunk) > max_chars:
                     break
@@ -765,9 +792,6 @@ def call_ai_provider(provider: str, model: Optional[str], prompt: str) -> Option
                 'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json',
             }
-            
-            if provider == 'openrouter':
-                headers['HTTP-Referer'] = 'https://github.com/henrino3/heimdall'
             
             req = urllib.request.Request(api_url, data=data, headers=headers)
         
@@ -1167,7 +1191,7 @@ def main():
     parser.add_argument('--strict', action='store_true', help='Ignore context, flag everything')
     parser.add_argument('--show-suppressed', action='store_true', help='Show suppressed findings')
     parser.add_argument('--analyze', action='store_true', help='AI-powered narrative analysis')
-    parser.add_argument('--provider', choices=['openrouter', 'anthropic', 'openai', 'zai'],
+    parser.add_argument('--provider', choices=['anthropic', 'openai', 'zai'],
                        help='AI provider to use (auto-detect if not specified)')
     parser.add_argument('--model', help='Specific model to use (provider default if not specified)')
     parser.add_argument('--interactive', action='store_true', help='Interactive review mode')

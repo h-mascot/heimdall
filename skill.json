@@ -19,7 +19,7 @@
     "os": ["darwin", "linux", "windows"],
     "requires": {
       "tools": ["exec"],
-      "env": ["OPENROUTER_API_KEY"]
+      "env": []
     }
   }
 }
