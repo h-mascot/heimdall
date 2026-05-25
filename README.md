@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/henrino3/heimdall/actions"><img src="https://img.shields.io/badge/build-passing-success?style=flat-square" alt="Build Status"></a>
-  <a href="https://github.com/henrino3/heimdall"><img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square" alt="Python Version"></a>
-  <a href="https://github.com/henrino3/heimdall"><img src="https://img.shields.io/badge/OpenClaw-Compatible-orange?style=flat-square" alt="OpenClaw Compatible"></a>
-  <a href="https://github.com/henrino3/heimdall/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/henrino3/heimdall/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome"></a>
+  <a href="https://github.com/h-mascot/heimdall/actions"><img src="https://img.shields.io/badge/build-passing-success?style=flat-square" alt="Build Status"></a>
+  <a href="https://github.com/h-mascot/heimdall"><img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square" alt="Python Version"></a>
+  <a href="https://github.com/h-mascot/heimdall"><img src="https://img.shields.io/badge/OpenClaw-Compatible-orange?style=flat-square" alt="OpenClaw Compatible"></a>
+  <a href="https://github.com/h-mascot/heimdall/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+  <a href="https://github.com/h-mascot/heimdall/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome"></a>
 </p>
 
 **Security scanner for AI agent skills.** Heimdall inspects OpenClaw skills and agent toolkits for malicious patterns *before* installation. Context-aware scanning combined with AI-powered narrative analysis to catch advanced threats.
@@ -31,7 +31,7 @@ skill-scan --analyze ./super-agent-skill
 
 ```bash
 # 1. Install Heimdall (if not using ClawHub)
-git clone https://github.com/henrino3/heimdall.git ~/clawd/skills/heimdall
+git clone https://github.com/h-mascot/heimdall.git ~/clawd/skills/heimdall
 
 # 2. Add the alias to your shell
 echo 'alias skill-scan="~/clawd/skills/heimdall/scripts/skill-scan.py"' >> ~/.bashrc

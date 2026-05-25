@@ -4,7 +4,7 @@
   "description": "Security scanner for AI agent skills. Scans for 100+ malicious patterns with context-aware detection and AI-powered narrative analysis.",
   "author": "henrino3",
   "license": "MIT",
-  "homepage": "https://github.com/henrino3/heimdall",
+  "homepage": "https://github.com/h-mascot/heimdall",
   "keywords": [
     "security",
     "scanner",

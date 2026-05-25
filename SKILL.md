@@ -167,4 +167,4 @@ Built by the Enterprise Crew 🚀
 - Spock 🖖 (Research & Ops) 
 - Scotty 🔧 (Builder)
 
-GitHub: https://github.com/henrino3/heimdall
+GitHub: https://github.com/h-mascot/heimdall

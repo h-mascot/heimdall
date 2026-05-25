@@ -953,7 +953,7 @@ def generate_sarif(result: ScanResult) -> Dict:
                 "driver": {
                     "name": "Heimdall Skill Scanner",
                     "version": "5.0",
-                    "informationUri": "https://github.com/henrino3/heimdall"
+                    "informationUri": "https://github.com/h-mascot/heimdall"
                 }
             },
             "results": []
