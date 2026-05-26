@@ -152,10 +152,11 @@ Patterns derived from:
 
 ## Installation Notes
 
-After installing from ClawHub, create an alias for convenience:
+After installing from ClawHub or cloning the repo, install the CLI entrypoint:
 ```bash
-echo 'alias skill-scan="~/clawd/skills/heimdall/scripts/skill-scan.py"' >> ~/.bashrc
-source ~/.bashrc
+~/clawd/skills/heimdall/install.sh
+# If needed for the current shell:
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 AI analysis routes through `openclaw agent` automatically (uses whatever model your gateway has configured). No extra API keys needed.

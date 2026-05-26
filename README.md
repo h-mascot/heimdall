@@ -33,9 +33,10 @@ skill-scan --analyze ./super-agent-skill
 # 1. Install Heimdall (if not using ClawHub)
 git clone https://github.com/h-mascot/heimdall.git ~/clawd/skills/heimdall
 
-# 2. Add the alias to your shell
-echo 'alias skill-scan="~/clawd/skills/heimdall/scripts/skill-scan.py"' >> ~/.bashrc
-source ~/.bashrc
+# 2. Install the CLI entrypoint
+~/clawd/skills/heimdall/install.sh
+# If ~/.local/bin is not on PATH for this shell:
+export PATH="$HOME/.local/bin:$PATH"
 
 # 3. Run a basic scan
 skill-scan /path/to/suspicious-skill
