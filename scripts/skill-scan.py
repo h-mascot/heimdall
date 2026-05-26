@@ -288,12 +288,23 @@ SECURITY_TOOL_INDICATORS = [
 ]
 
 
+def is_security_tool_file(filepath) -> bool:
+    """Return true only for the scanned file name, not arbitrary parent dirs.
+
+    A malicious skill can be named `heimdall-risky` or placed under a path that
+    includes `skill-scan`; using the full path here caused default scans to
+    suppress real findings. Keep the context discount limited to files that are
+    themselves recognisably security-tool/pattern files.
+    """
+    name = Path(filepath).name.lower()
+    return any(indicator in name for indicator in SECURITY_TOOL_INDICATORS)
+
+
 def get_file_context(filepath: Path) -> Context:
     suffix = filepath.suffix.lower()
     name = filepath.name.lower()
-    for indicator in SECURITY_TOOL_INDICATORS:
-        if indicator in str(filepath).lower():
-            return Context.DOCS
+    if is_security_tool_file(filepath):
+        return Context.DOCS
     if any(doc in name for doc in ['readme', 'changelog', 'license', 'contributing', 'history']):
         return Context.DOCS
     return FILE_CONTEXTS.get(suffix, Context.CODE)
@@ -317,7 +328,7 @@ def is_blocklist_definition(line: str, prev_lines: List[str]) -> bool:
 def adjust_severity_for_context(severity: Severity, context: Context, 
                                  is_string: bool, is_blocklist: bool,
                                  filepath: str = "") -> Tuple[Severity, str]:
-    is_security_tool = any(ind in filepath.lower() for ind in SECURITY_TOOL_INDICATORS)
+    is_security_tool = is_security_tool_file(filepath)
     
     if is_blocklist:
         return Severity.SAFE, "Pattern in blocklist definition"
